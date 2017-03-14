@@ -57,14 +57,10 @@ struct fpc1020_data {
 	int screen_on;
 };
 
-/*
- * From drivers/input/keyboard/gpio_keys.c
- */
 extern bool home_button_pressed(void);
-/*
- * From drivers/input/keyboard/gpio_keys.c
- */
-extern void reset_home_button(void);
+extern void reset_home_button(bool);
+
+bool reset;
 
 static int fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
 
@@ -154,12 +150,13 @@ static ssize_t set_wakeup_status(struct device* device,
 
 	return strnlen(buffer, count);
 }
+
 static DEVICE_ATTR(wakeup, S_IRUSR | S_IWUSR, get_wakeup_status, set_wakeup_status);
 
 static ssize_t get_key(struct device* device, struct device_attribute* attribute, char* buffer)
 {
 	struct fpc1020_data* fpc1020 = dev_get_drvdata(device);
-	return scnprintf(buffer, PAGE_SIZE, "%i\n", fpc1020->report_key);
+		return scnprintf(buffer, PAGE_SIZE, "%i\n", fpc1020->report_key);
 }
 
 static ssize_t set_key(struct device* device,
@@ -175,23 +172,25 @@ static ssize_t set_key(struct device* device,
 	if (!retval) {
 		if (val == KEY_HOME)
 			val = KEY_NAVI_LONG;  //Convert to U-touch long press keyValue
+		if (val != 0 && home_button_pressed()) val = 0;
 
-	    home_pressed = home_button_pressed();
-
-		if (val && home_pressed) val = 0;
-
-		pr_info("home key pressed = %d\n", (int)home_pressed);
+		pr_info("home key pressed = %d\n", (int)home_button_pressed());
 		fpc1020->report_key = (int)val;
 		queue_work(fpc1020->fpc1020_wq, &fpc1020->input_report_work);
 
-		if (!val) {
+		if (val == 0) {
 			pr_info("calling home key reset");
-			reset_home_button();
+			reset_home_button(0);
 		}
-		
 	} else
 		return -ENOENT;
 	return strnlen(buffer, count);
+}
+
+bool reset_gpio(void)
+{
+	return reset;
+}
 
 static DEVICE_ATTR(key, S_IRUSR | S_IWUSR, get_key, set_key);
 
@@ -207,6 +206,7 @@ static ssize_t set_screen_stat(struct device* device,
 {
 	return 1;
 }
+
 static DEVICE_ATTR(screen, S_IRUSR | S_IWUSR, get_screen_stat, set_screen_stat);
 
 static struct attribute *attributes[] = {
@@ -217,6 +217,7 @@ static struct attribute *attributes[] = {
 	&dev_attr_screen.attr,
 	NULL
 };
+
 static const struct attribute_group attribute_group = {
 	.attrs = attributes,
 };
@@ -338,7 +339,6 @@ static int fpc1020_manage_sysfs(struct fpc1020_data *fpc1020)
 	}
 	return 0;
 }
-
 
 static int fpc1020_alloc_input_dev(struct fpc1020_data *fpc1020)
 {
