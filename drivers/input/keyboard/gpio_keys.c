@@ -34,6 +34,8 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/syscore_ops.h>
 
+#define HOME_KEY_CODE 102
+
 struct gpio_button_data {
 	const struct gpio_keys_button *button;
 	struct input_dev *input;
@@ -355,7 +357,7 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	state = ( gpio_value ? 1 : 0) ^ button->active_low;
 	pr_info("key gpio value = %d active_low = %d  state=%d home_button_status=%d\n" , gpio_value, button->active_low, state, home_button_status);
 
-	if (state) {
+	if (state && (int)button->code == HOME_KEY_CODE) {
 		home_button_status = true;
 	}
 
@@ -382,11 +384,6 @@ void reset_home_button(void)
  * Used by drivers/misc/fpc1020_ree.c
  * Returns a bool specifying whether home button is pressed.
  */
-bool home_button_pressed(void)
-{
-	return home_button_status;
-}
-
 bool home_button_pressed(void)
 {
 	return home_button_status;
