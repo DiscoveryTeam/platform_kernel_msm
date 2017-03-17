@@ -388,7 +388,6 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 			fpc1020->screen_on = 1;
 		} else if (*blank == FB_BLANK_POWERDOWN) {
 			pr_err("ScreenOff\n");
-			reset_home_button(0);
 			fpc1020->screen_on = 0;
 		}
 	}
